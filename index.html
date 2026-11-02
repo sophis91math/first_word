@@ -87,6 +87,10 @@
   @keyframes pop{0%{transform:scale(.7)}100%{transform:scale(1)}}
   .btnrow{display:flex; gap:12px; justify-content:center; flex-wrap:wrap}
   .big{background:var(--accent); color:#fff; font-size:30px; padding:16px 44px; box-shadow:0 6px 0 #c94a2d}
+  .manual{display:flex; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap; margin-top:18px}
+  .manual span{color:var(--muted); font-size:15px}
+  .manual input{width:120px; height:64px; padding:0; text-align:center; font-size:34px; letter-spacing:.15em}
+  .manual button{background:var(--accent2); color:#fff; box-shadow:0 5px 0 #2a5bc0; font-size:19px; padding:12px 18px}
   .opts{display:flex; gap:10px 18px; flex-wrap:wrap; justify-content:center; margin-top:18px; color:var(--muted); font-size:15px}
   .opts label{display:flex; align-items:center; gap:6px; cursor:pointer}
   .opts input[type=checkbox]{width:18px; height:18px; accent-color:var(--accent)}
@@ -250,11 +254,16 @@
         <div class="tile b empty" id="t2">?</div>
       </div>
       <div class="btnrow"><button class="big" id="draw">초성 뽑기!</button></div>
+      <form class="manual" id="manualForm" autocomplete="off">
+        <span>또는 직접 입력</span>
+        <input id="mc" maxlength="6" placeholder="ㄱㅅ" autocapitalize="off" spellcheck="false">
+        <button type="submit" id="manualBtn">이 초성으로 시작</button>
+      </form>
       <div class="opts">
         <label><input type="checkbox" id="optEasy"> 어려운 초성(ㅋ·ㅌ·ㅍ) 빼기</label>
         <label><input type="checkbox" id="optSame"> 같은 초성 두 번 안 나오게</label>
         <label><input type="checkbox" id="optAuto" checked> 뽑으면 타이머 자동 시작</label>
-        <label>결승선 <select id="goal"><option>5</option><option>8</option><option selected>10</option><option>15</option><option>20</option></select> 개</label>
+        <label>결승선 <select id="goal"><option>5</option><option>8</option><option>10</option><option selected>15</option><option>20</option></select> 개</label>
       </div>
     </section>
     <section class="panel timer" id="timerPanel">
@@ -341,14 +350,14 @@
 // ★ 3. 이 게임이 쓰는 Firestore 위치: chosungRooms/{방번호}, chosungRooms/{방번호}/students/{학번_이름}
 // ============================================================
 const firebaseConfig = {
-    apiKey: "AIzaSyCZcy-y7gFw1GREbVo-c9t4G-MySqmcFuc",
-    authDomain: "firstword2-d6abd.firebaseapp.com",
-    projectId: "firstword2-d6abd",
-    storageBucket: "firstword2-d6abd.firebasestorage.app",
-    messagingSenderId: "218709483014",
-    appId: "1:218709483014:web:cdaa284b85cbcd415bad87",
-    measurementId: "G-8M0MF18C1M"
-  };
+  apiKey: "AIzaSyB8D07YFQ9C-EAjah9bV__nhVnAU94YgL4",
+  authDomain: "avgerage-bd9af.firebaseapp.com",
+  projectId: "avgerage-bd9af",
+  storageBucket: "avgerage-bd9af.firebasestorage.app",
+  messagingSenderId: "155603517696",
+  appId: "1:155603517696:web:09ca46068e7978133c33e5",
+  measurementId: "G-6KGE2EKM6Z"
+};
 const TEACHER_PASSWORD = '13579';
 const ROOT = 'chosungRooms';
 const ROOM_TTL = 7 * 24 * 60 * 60 * 1000;
@@ -370,6 +379,7 @@ async function makeStore(){
     setRoom(pin, data, merge = true){ return fs.setDoc(roomRef(pin), data, { merge }); },
     watchRoom(pin, cb, err){ return fs.onSnapshot(roomRef(pin), s => cb(s.exists() ? s.data() : null), err); },
     setStudent(pin, key, data){ return fs.setDoc(fs.doc(db, ROOT, pin, 'students', key), data, { merge: true }); },
+    async getStudent(pin, key){ const s = await fs.getDoc(fs.doc(db, ROOT, pin, 'students', key)); return s.exists() ? s.data() : null; },
     watchStudents(pin, cb, err){ return fs.onSnapshot(stuCol(pin), s => { const a = []; s.forEach(d => a.push({ key: d.id, ...d.data() })); cb(a); }, err); },
     async clearStudents(pin){
       const s = await fs.getDocs(stuCol(pin)); const b = fs.writeBatch(db);
@@ -392,6 +402,7 @@ function mockStore(){
     async setRoom(pin, data, merge = true){ const d = load(); d[pin] = d[pin] || { room: null, students: {} }; d[pin].room = merge ? { ...(d[pin].room || {}), ...data } : data; save(d); },
     watchRoom(pin, cb){ return sub(() => cb(load()[pin]?.room || null)); },
     async setStudent(pin, key, data){ const d = load(); d[pin] = d[pin] || { room: null, students: {} }; d[pin].students[key] = { ...(d[pin].students[key] || {}), ...data }; save(d); },
+    async getStudent(pin, key){ return load()[pin]?.students?.[key] || null; },
     watchStudents(pin, cb){ return sub(() => { const s = load()[pin]?.students || {}; cb(Object.entries(s).map(([key, v]) => ({ key, ...v }))); }); },
     async clearStudents(pin){ const d = load(); if (d[pin]) d[pin].students = {}; save(d); }
   };
@@ -450,8 +461,13 @@ function validWords(st){
     seen.add(w); return true;
   });
 }
-function ranked(){
-  const arr = students.map(s => ({ ...s, valid: validWords(s) })).map(s => ({ ...s, n: s.valid.length }));
+// 교사: 학생 문서에서 직접 센다 / 학생: 교사가 올린 순위표(room.board)만 본다
+function standings(){
+  if (mode === 'teacher') return students.map(s => { const w = validWords(s); return { key: s.key, studentId: s.studentId, name: s.name, n: w.length, words: w }; });
+  return Array.isArray(room?.board) ? room.board : [];
+}
+function ranked(list = standings()){
+  const arr = list.map(s => ({ ...s }));
   arr.sort((a, b) => b.n - a.n || String(a.studentId).localeCompare(String(b.studentId), 'ko', { numeric: true }));
   let rank = 0, prev = null;
   arr.forEach((r, i) => { if (r.n !== prev){ rank = i + 1; prev = r.n; } r.rank = r.n > 0 ? rank : null; });
@@ -461,7 +477,7 @@ function ranked(){
 // ---------------- 거북이 레이스 ----------------
 const lastCount = new Map();
 function renderRace(el, myKey){
-  const goal = room?.goal || 10;
+  const goal = room?.goal || 15;
   const list = ranked().sort((a, b) => String(a.studentId).localeCompare(String(b.studentId), 'ko', { numeric: true }));
   if (!list.length){ el.innerHTML = '<div class="empty">아직 들어온 학생이 없어요. 방 번호를 알려 주세요!</div>'; return; }
   const top = Math.max(0, ...list.map(s => s.n));
@@ -494,10 +510,12 @@ function renderRace(el, myKey){
 // ---------------- 결과 ----------------
 let shownResultFor = null;
 function showResults(celebrate){
-  const r = ranked();
+  const final = mode === 'student' && room?.results?.round === room?.round ? room.results.list : null;
+  const r = ranked(final || standings());
   const players = r.filter(x => x.n > 0);
-  const total = r.reduce((a, x) => a + x.n, 0);
-  $('resSub').textContent = room?.pair ? `초성 ${room.pair[0]}${room.pair[1]} · 참가 ${r.length}명 · 단어 ${total}개` : '아직 진행한 판이 없어요';
+  const total = final ? room.results.total : r.reduce((a, x) => a + x.n, 0);
+  const count = final ? room.results.players : r.length;
+  $('resSub').textContent = room?.pair ? `초성 ${room.pair[0]}${room.pair[1]} · 참가 ${count}명 · 단어 ${total}개` : '아직 진행한 판이 없어요';
   const groups = [1, 2, 3].map(k => players.filter(x => x.rank === k));
   const col = (k, cls) => {
     const g = groups[k - 1];
@@ -509,7 +527,7 @@ function showResults(celebrate){
   $('podium').innerHTML = col(2, 'p2') + col(1, 'p1') + col(3, 'p3');
   const top = players.filter(x => x.rank <= 3);
   $('detail').innerHTML = top.length
-    ? top.map(x => `<div class="row"><b>${x.rank}등 ${esc(x.studentId)} ${esc(x.name)}</b><span>${x.valid.map(esc).join(', ')}</span></div>`).join('')
+    ? top.map(x => `<div class="row"><b>${x.rank}등 ${esc(x.studentId)} ${esc(x.name)}</b><span>${(x.words || []).map(esc).join(', ')}</span></div>`).join('')
     : '<div class="row"><span>단어를 쓴 학생이 없어요.</span></div>';
   $('resOverlay').classList.add('show');
   if (celebrate && players.length) confetti();
@@ -543,9 +561,8 @@ function listen(p){
     room = data;
     if (mode === 'teacher') T.onRoom(prevRound); else S.onRoom(prevRound);
   }, e => { console.error(e); toast('방 정보를 불러오지 못했어요.', true); }));
-  unsubs.push(store.watchStudents(p, list => {
-    students = list;
-    if (mode === 'teacher') T.onStudents(); else S.onStudents();
+  if (mode === 'teacher') unsubs.push(store.watchStudents(p, list => {
+    students = list; T.onStudents();
   }, e => console.error(e)));
 }
 
@@ -582,7 +599,7 @@ $('pwForm').addEventListener('submit', async e => {
       else if (r.createdAt && Date.now() - r.createdAt > ROOM_TTL){ await store.clearStudents(cand); newPin = cand; }
     }
     if (!newPin) return toast('방을 만들 수 없어요. 잠시 후 다시 시도하세요.', true);
-    await store.setRoom(newPin, { createdAt: Date.now(), round: null, pair: null, status: 'idle', endsAt: 0, remainMs: 60000, duration: 60, goal: 10 }, false);
+    await store.setRoom(newPin, { createdAt: Date.now(), round: null, pair: null, status: 'idle', endsAt: 0, remainMs: 60000, duration: 60, goal: 15 }, false);
     ls.set('chosungTeacherPin', { pin: newPin, at: Date.now() });
     T.enter(newPin);
     toast(`방 ${newPin}이(가) 만들어졌어요.`);
@@ -607,9 +624,10 @@ $('joinForm').addEventListener('submit', async e => {
     if (!r) return toast('없는 방 번호예요.', true);
     if (r.createdAt && Date.now() - r.createdAt > ROOM_TTL) return toast('만료된 방이에요.', true);
     const key = `${sid}_${name}`.replace(/[\/.#$\[\]]/g, '');
-    await store.setStudent(p, key, { studentId: sid, name, joinedAt: Date.now() });
+    const joinedAt = Date.now();
+    await store.setStudent(p, key, { studentId: sid, name, joinedAt });
     ls.set('chosungStudent', { pin: p, sid, name });
-    S.enter(p, key, sid, name);
+    S.enter(p, key, sid, name, joinedAt);
     toast(`${name} 학생, 환영해요! 🐢`);
   } catch (err){ console.error(err); toast('입장에 실패했어요.', true); }
   finally { $('joinBtn').disabled = false; }
@@ -630,13 +648,15 @@ const T = (() => {
     $('tPin').textContent = p; show('sTeacher');
     [t1, t2].forEach(t => { t.className = t.className.replace(/ ?(done|pop|spin)/g, '') + ' empty'; t.textContent = '?'; });
     drawBtn.textContent = '초성 뽑기!';
-    restored = false; listen(p); renderRace($('tTrack'));
+    restored = false; lastBoard = null; boardRound = null; listen(p); renderRace($('tTrack'));
   }
   let restored = false;
+  let boardRound = null;
   function onRoom(){
+    if (room.round !== boardRound){ boardRound = room.round; scheduleBoard(); }
     if (!restored){
       restored = true;
-      total = room.duration || 60; $('goal').value = String(room.goal || 10);
+      total = room.duration || 60; $('goal').value = String(room.goal || 15);
       document.querySelectorAll('#presets button').forEach(b => b.classList.toggle('on', +b.dataset.s === total));
       if (room.pair){ setTiles(room.pair); drawBtn.textContent = '다시 뽑기!'; }
       if (room.status === 'running' && room.endsAt > Date.now()){ remain = (room.endsAt - Date.now()) / 1000; startLocal(); }
@@ -647,10 +667,28 @@ const T = (() => {
     }
     renderRace($('tTrack')); updateInfo();
   }
-  function onStudents(){ renderRace($('tTrack')); updateInfo(); }
+  function onStudents(){ renderRace($('tTrack')); updateInfo(); scheduleBoard(); }
+
+  // 학생 화면용 순위표: 1.5초에 한 번, 바뀌었을 때만 방 정보에 올린다
+  let boardTimer = null, lastBoard = null;
+  function boardNow(){ return standings().map(({ key, studentId, name, n }) => ({ key, studentId, name, n })); }
+  function publishBoard(){
+    boardTimer = null;
+    if (!pin || !room) return;
+    const b = boardNow(), j = JSON.stringify(b);
+    if (j === lastBoard) return;
+    lastBoard = j; save({ board: b });
+  }
+  function scheduleBoard(){ if (!boardTimer) boardTimer = setTimeout(publishBoard, 1500); }
+  function publishFinal(){
+    clearTimeout(boardTimer); boardTimer = null;
+    const list = ranked().filter(x => x.rank && x.rank <= 3).map(({ key, studentId, name, n, words }) => ({ key, studentId, name, n, words }));
+    const b = boardNow(); lastBoard = JSON.stringify(b);
+    save({ board: b, results: { round: room.round, list, players: b.length, total: b.reduce((a, x) => a + x.n, 0) } });
+  }
   function updateInfo(){
     $('tCount').textContent = `참가 ${students.length}명`;
-    $('tRaceInfo').textContent = `단어 1개 = 한 걸음 · ${room?.goal || 10}개면 결승선!`;
+    $('tRaceInfo').textContent = `단어 1개 = 한 걸음 · ${room?.goal || 15}개면 결승선!`;
   }
   function setTiles(p){ [[t1, p[0]], [t2, p[1]]].forEach(([el, c]) => { el.classList.remove('empty', 'spin'); el.classList.add('done'); el.textContent = c; }); }
 
@@ -667,19 +705,41 @@ const T = (() => {
       })(start);
     });
   }
-  async function draw(){
+  // manual: 교사가 직접 넣은 초성 [a, b] (없으면 랜덤)
+  async function draw(manual){
     if (drawing) return;
-    drawing = true; drawBtn.disabled = true; audio(); hideResults();
+    drawing = true; drawBtn.disabled = true; $('manualBtn').disabled = true; audio(); hideResults();
     stopLocal(); remain = total; over = false; render();
-    const p = pool(); const a = pick(p); let b = pick(p);
-    if ($('optSame').checked) while (b === a) b = pick(p);
+    let a, b;
+    if (manual){ [a, b] = manual; }
+    else { const p = pool(); a = pick(p); b = pick(p); if ($('optSame').checked) while (b === a) b = pick(p); }
     const round = Date.now().toString(36);
     save({ round, pair: null, status: 'drawing', remainMs: total * 1000, duration: total, goal: +$('goal').value });
-    await Promise.all([spinTile(t1, a, 1100), spinTile(t2, b, 1700)]);
+    if (manual) await Promise.all([spinTile(t1, a, 500), spinTile(t2, b, 800)]);
+    else await Promise.all([spinTile(t1, a, 1100), spinTile(t2, b, 1700)]);
     save({ pair: [a, b], status: 'ready' });
-    drawing = false; drawBtn.disabled = false; drawBtn.textContent = '다시 뽑기!';
+    drawing = false; drawBtn.disabled = false; $('manualBtn').disabled = false; drawBtn.textContent = '다시 뽑기!';
     if ($('optAuto').checked) start();
   }
+
+  // 직접 입력: 'ㄱㅅ', 'ㄳ'(겹자음), '가사'(글자) 모두 초성 두 개로 바꾼다
+  const SPLIT = { 'ㄳ':'ㄱㅅ','ㄵ':'ㄴㅈ','ㄶ':'ㄴㅎ','ㄺ':'ㄹㄱ','ㄻ':'ㄹㅁ','ㄼ':'ㄹㅂ','ㄽ':'ㄹㅅ','ㄾ':'ㄹㅌ','ㄿ':'ㄹㅍ','ㅀ':'ㄹㅎ','ㅄ':'ㅂㅅ' };
+  function parseCho(v){
+    const out = [];
+    for (const ch of [...(v || '').replace(/\s+/g, '')]){
+      if (SPLIT[ch]) out.push(...SPLIT[ch]);
+      else if (CHO.includes(ch)) out.push(ch);
+      else { const c = choOf(ch); if (c) out.push(c); else return null; }
+    }
+    return out;
+  }
+  $('manualForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const r = parseCho($('mc').value);
+    if (!r || r.length !== 2){ toast('초성 두 개를 입력하세요. (예: ㄱㅅ)', true); $('mc').select(); return; }
+    $('mc').value = r.join(''); $('mc').blur();
+    draw(r);
+  });
 
   function render(){
     const frac = total > 0 ? Math.max(0, remain / total) : 0;
@@ -718,7 +778,8 @@ const T = (() => {
     save({ status: 'ended', remainMs: 0 });
     $('timerPanel').classList.remove('flash'); void $('timerPanel').offsetWidth; $('timerPanel').classList.add('flash');
     [0, 250, 500].forEach((d, i) => setTimeout(() => beep(i === 2 ? 1046 : 784, .35, .2, 'triangle'), d));
-    setTimeout(() => showResults(true), 1200); // 학생들의 마지막 입력이 도착할 시간을 조금 기다린다
+    // 학생들의 마지막 입력이 도착할 시간을 조금 기다린 뒤 최종 결과를 올린다
+    setTimeout(() => { if (room?.status === 'ended'){ publishFinal(); showResults(true); } }, 1500);
   }
   function reset(){
     stopLocal(); remain = total; over = false; render();
@@ -730,7 +791,7 @@ const T = (() => {
     reset();
   }
 
-  drawBtn.onclick = draw;
+  drawBtn.onclick = () => draw();
   goBtn.onclick = () => running ? pause() : start();
   $('reset').onclick = reset;
   $('plus').onclick = () => { if (running){ endAt += 10000; total += 10; save({ endsAt: Date.now() + (remain + 10) * 1000 }); } else setTotal(total + 10); };
@@ -746,7 +807,7 @@ const T = (() => {
       armT = setTimeout(() => { kick.classList.remove('armed'); kick.textContent = '참가자 모두 내보내기'; }, 3000); return;
     }
     clearTimeout(armT); kick.classList.remove('armed'); kick.textContent = '참가자 모두 내보내기';
-    try { await store.clearStudents(pin); toast('참가자를 모두 내보냈어요.'); } catch (e){ console.error(e); toast('내보내기에 실패했어요.', true); }
+    try { await store.clearStudents(pin); save({ kickedAt: Date.now(), board: [] }); lastBoard = '[]'; toast('참가자를 모두 내보냈어요.'); } catch (e){ console.error(e); toast('내보내기에 실패했어요.', true); }
   };
 
   document.addEventListener('keydown', e => {
@@ -764,12 +825,12 @@ const T = (() => {
 // ============================================================
 const S = (() => {
   const wordIn = $('word'), wordBtn = $('wordBtn');
-  let key = null, sid = null, name = null, myRound = null, myWords = [], loop = null, restored = false;
+  let key = null, sid = null, name = null, myRound = null, myWords = [], loop = null, joinedAt = 0;
   let save = null;
 
-  function enter(p, k, s, n){
-    pin = p; key = k; sid = s; name = n; mode = 'student'; room = null; students = [];
-    myRound = null; myWords = []; restored = false; shownResultFor = null;
+  function enter(p, k, s, n, j){
+    pin = p; key = k; sid = s; name = n; joinedAt = j; mode = 'student'; room = null; students = [];
+    myRound = null; myWords = []; shownResultFor = null;
     save = writer(d => store.setStudent(pin, key, d));
     $('sWho').innerHTML = `🐢 ${esc(sid)} ${esc(name)}<small>방 ${esc(p)}</small>`;
     $('msg').textContent = ''; renderMine();
@@ -778,31 +839,26 @@ const S = (() => {
   }
 
   function onRoom(prevRound){
-    if (room.round !== myRound){ myRound = room.round; myWords = []; restored = false; tryRestore(); renderMine(); $('msg').textContent = ''; }
+    if (room.kickedAt && room.kickedAt > joinedAt){ toast('선생님이 참가자를 정리했어요. 다시 입장해 주세요.', true); leave(); return; }
+    if (room.round !== myRound){ myRound = room.round; myWords = []; restore(room.round); renderMine(); $('msg').textContent = ''; }
     const p = room.pair;
     [['s1', 0], ['s2', 1]].forEach(([id, i]) => {
       const el = $(id);
       if (p){ if (el.textContent !== p[i] || el.classList.contains('empty')){ el.classList.remove('empty', 'spin'); el.textContent = p[i]; el.classList.remove('pop'); void el.offsetWidth; el.classList.add('done', 'pop'); } }
       else { el.classList.remove('done', 'pop'); el.classList.add(room.status === 'drawing' ? 'spin' : 'empty'); el.textContent = '?'; }
     });
-    if (room.status === 'ended' && room.round && shownResultFor !== room.round){ shownResultFor = room.round; setTimeout(() => showResults(true), 1500); }
+    if (room.status === 'ended' && room.results?.round === room.round && shownResultFor !== room.round){ shownResultFor = room.round; showResults(true); }
     if (room.status !== 'ended') hideResultsIfNew(prevRound);
-    gate(); renderRace($('sTrack'), key); $('sRaceInfo').textContent = `${room.goal || 10}개면 결승선!`;
+    gate(); renderRace($('sTrack'), key); $('sRaceInfo').textContent = `${room.goal || 15}개면 결승선! (순위는 1~2초마다 갱신)`;
   }
   function hideResultsIfNew(prev){ if (prev !== undefined && prev !== room.round) hideResults(); }
-  function onStudents(){
-    if (!students.find(s => s.key === key) && room){ /* 선생님이 내보낸 경우 */
-      if (students.length === 0 && myWords.length === 0){ toast('선생님이 참가자를 정리했어요. 다시 입장해 주세요.', true); leave(); return; }
-    }
-    tryRestore(); renderRace($('sTrack'), key);
-  }
-  // 새로고침 후 내가 쓴 단어 되살리기
-  function tryRestore(){
-    if (restored || !room) return;
-    const me = students.find(s => s.key === key);
-    if (!me) return;
-    restored = true;
-    if (me.round === room.round && Array.isArray(me.words) && myWords.length === 0){ myWords = me.words.slice(); renderMine(); }
+  // 새로고침 후 내가 쓴 단어 되살리기 (내 문서 한 번만 읽기)
+  async function restore(round){
+    if (!round) return;
+    try {
+      const me = await store.getStudent(pin, key);
+      if (me && me.round === round && room?.round === round && Array.isArray(me.words) && myWords.length === 0){ myWords = me.words.slice(); renderMine(); }
+    } catch (e){ console.error(e); }
   }
 
   const canType = () => room && room.pair && room.status === 'running';
@@ -859,7 +915,7 @@ const S = (() => {
     const x = e.target.closest('.x'); if (!x || !canType()) return;
     myWords.splice(+x.dataset.i, 1); push(); renderMine();
   });
-  return { enter, onRoom, onStudents };
+  return { enter, onRoom };
 })();
 
 // ---------------- 시작 ----------------
