@@ -349,16 +349,18 @@
 // ★ 2. 교사용 방 만들기 비밀번호
 // ★ 3. 이 게임이 쓰는 Firestore 위치: chosungRooms/{방번호}, chosungRooms/{방번호}/students/{학번_이름}
 // ============================================================
-const firebaseConfig = {
-  apiKey: "AIzaSyB8D07YFQ9C-EAjah9bV__nhVnAU94YgL4",
-  authDomain: "avgerage-bd9af.firebaseapp.com",
-  projectId: "avgerage-bd9af",
-  storageBucket: "avgerage-bd9af.firebasestorage.app",
-  messagingSenderId: "155603517696",
-  appId: "1:155603517696:web:09ca46068e7978133c33e5",
-  measurementId: "G-6KGE2EKM6Z"
-};
+
 const TEACHER_PASSWORD = '13579';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCZcy-y7gFw1GREbVo-c9t4G-MySqmcFuc",
+  authDomain: "firstword2-d6abd.firebaseapp.com",
+  projectId: "firstword2-d6abd",
+  storageBucket: "firstword2-d6abd.firebasestorage.app",
+  messagingSenderId: "218709483014",
+  appId: "1:218709483014:web:cdaa284b85cbcd415bad87",
+  measurementId: "G-8M0MF18C1M"
+};
 const ROOT = 'chosungRooms';
 const ROOM_TTL = 7 * 24 * 60 * 60 * 1000;
 
@@ -391,6 +393,12 @@ async function makeStore(){
 // 테스트용: 같은 브라우저 탭끼리 localStorage로 공유 (주소 끝에 ?mock 을 붙였을 때만)
 function mockStore(){
   const K = 'chosungMock';
+  // Firestore처럼 undefined 값과 배열 속 배열은 거부
+  const check = (v, path = '') => {
+    if (v === undefined) throw { code: 'invalid-argument', message: 'Unsupported field value: undefined (' + path + ')' };
+    if (Array.isArray(v)) v.forEach((x, i) => { if (Array.isArray(x)) throw { code: 'invalid-argument', message: 'nested array ' + path }; check(x, path + '[' + i + ']'); });
+    else if (v && typeof v === 'object') Object.entries(v).forEach(([k, x]) => check(x, path + '.' + k));
+  };
   const load = () => { try { return JSON.parse(localStorage.getItem(K)) || {}; } catch { return {}; } };
   const save = d => { localStorage.setItem(K, JSON.stringify(d)); fire(); };
   const subs = new Set();
@@ -399,9 +407,9 @@ function mockStore(){
   const sub = f => { subs.add(f); setTimeout(f, 0); return () => subs.delete(f); };
   return {
     async getRoom(pin){ return load()[pin]?.room || null; },
-    async setRoom(pin, data, merge = true){ const d = load(); d[pin] = d[pin] || { room: null, students: {} }; d[pin].room = merge ? { ...(d[pin].room || {}), ...data } : data; save(d); },
+    async setRoom(pin, data, merge = true){ check(data); const d = load(); d[pin] = d[pin] || { room: null, students: {} }; d[pin].room = merge ? { ...(d[pin].room || {}), ...data } : data; save(d); },
     watchRoom(pin, cb){ return sub(() => cb(load()[pin]?.room || null)); },
-    async setStudent(pin, key, data){ const d = load(); d[pin] = d[pin] || { room: null, students: {} }; d[pin].students[key] = { ...(d[pin].students[key] || {}), ...data }; save(d); },
+    async setStudent(pin, key, data){ check(data); const d = load(); d[pin] = d[pin] || { room: null, students: {} }; d[pin].students[key] = { ...(d[pin].students[key] || {}), ...data }; save(d); },
     async getStudent(pin, key){ return load()[pin]?.students?.[key] || null; },
     watchStudents(pin, cb){ return sub(() => { const s = load()[pin]?.students || {}; cb(Object.entries(s).map(([key, v]) => ({ key, ...v }))); }); },
     async clearStudents(pin){ const d = load(); if (d[pin]) d[pin].students = {}; save(d); }
@@ -425,7 +433,18 @@ let students = [];          // 학생 목록
 let pin = null, mode = 'home';
 let unsubs = [];
 
-function toast(t, err){ const el = $('toast'); el.textContent = t; el.className = 'show' + (err ? ' err' : ''); clearTimeout(toast.t); toast.t = setTimeout(() => el.className = '', 2600); }
+// Firebase 오류를 선생님이 알아볼 수 있는 말로 바꾼다
+function why(err){
+  const c = String(err?.code || err?.message || err || '');
+  if (c.includes('permission-denied')) return 'Firestore 규칙이 막고 있어요 → 규칙에 chosungRooms를 추가하고 [게시]를 눌렀는지 확인하세요.';
+  if (c.includes('not-found') || c.includes('failed-precondition') || c.includes('NOT_FOUND')) return 'Firestore 데이터베이스가 아직 없어요 → Firestore Database에서 [데이터베이스 만들기]를 하세요.';
+  if (c.includes('admin-restricted') || c.includes('operation-not-allowed')) return '익명 로그인이 꺼져 있어요 → Authentication > 로그인 방법 > 익명을 사용 설정하세요.';
+  if (c.includes('unauthorized-domain')) return '이 주소가 승인되지 않았어요 → Authentication > 설정 > 승인된 도메인에 이 사이트 주소를 추가하세요.';
+  if (c.includes('api-key') || c.includes('invalid-api')) return 'firebaseConfig 값이 잘못됐어요 → 콘솔의 설정값을 다시 붙여 넣으세요.';
+  if (c.includes('unavailable') || c.includes('network')) return '인터넷 연결 또는 학교망 차단 문제예요.';
+  return '오류 코드: ' + c;
+}
+function toast(t, err){ const el = $('toast'); el.textContent = t; el.className = 'show' + (err ? ' err' : ''); clearTimeout(toast.t); toast.t = setTimeout(() => el.className = '', err ? 7000 : 2600); }
 function show(id){ document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id)); }
 
 // 같은 문서에는 한 번에 하나씩 쓰기 (마지막 값만 반영)
@@ -590,20 +609,25 @@ $('pwForm').addEventListener('submit', async e => {
     return;
   }
   toast('방을 만드는 중…');
+  let newPin = null, step = '방 번호 확인';
   try {
-    let newPin = null;
     for (let i = 0; i < 10 && !newPin; i++){
       const cand = String(Math.floor(10000 + Math.random() * 90000));
       const r = await store.getRoom(cand);
       if (!r) newPin = cand;
-      else if (r.createdAt && Date.now() - r.createdAt > ROOM_TTL){ await store.clearStudents(cand); newPin = cand; }
+      else if (r.createdAt && Date.now() - r.createdAt > ROOM_TTL){ step = '오래된 방 정리'; await store.clearStudents(cand); newPin = cand; }
     }
     if (!newPin) return toast('방을 만들 수 없어요. 잠시 후 다시 시도하세요.', true);
+    step = '방 저장';
     await store.setRoom(newPin, { createdAt: Date.now(), round: null, pair: null, status: 'idle', endsAt: 0, remainMs: 60000, duration: 60, goal: 15 }, false);
-    ls.set('chosungTeacherPin', { pin: newPin, at: Date.now() });
-    T.enter(newPin);
-    toast(`방 ${newPin}이(가) 만들어졌어요.`);
-  } catch (err){ console.error(err); toast('방 만들기에 실패했어요. Firebase 설정과 규칙을 확인하세요.', true); }
+  } catch (err){
+    console.error(err);
+    const m = `방 만들기 실패 (${step} 단계) — ` + why(err);
+    toast(m, true); $('conn').textContent = m; $('conn').classList.add('err'); return;
+  }
+  ls.set('chosungTeacherPin', { pin: newPin, at: Date.now() });
+  try { T.enter(newPin); toast(`방 ${newPin}이(가) 만들어졌어요.`); }
+  catch (err){ console.error(err); const m = `방은 만들어졌지만 화면을 여는 중 오류: ${err?.message || err}`; toast(m, true); $('conn').textContent = m; $('conn').classList.add('err'); }
 });
 function refreshReopen(){
   const t = ls.get('chosungTeacherPin');
@@ -629,7 +653,7 @@ $('joinForm').addEventListener('submit', async e => {
     ls.set('chosungStudent', { pin: p, sid, name });
     S.enter(p, key, sid, name, joinedAt);
     toast(`${name} 학생, 환영해요! 🐢`);
-  } catch (err){ console.error(err); toast('입장에 실패했어요.', true); }
+  } catch (err){ console.error(err); toast('입장 실패 — ' + why(err), true); }
   finally { $('joinBtn').disabled = false; }
 });
 
@@ -921,7 +945,7 @@ const S = (() => {
 // ---------------- 시작 ----------------
 refreshReopen();
 makeStore().then(s => { store = s; $('conn').textContent = '✅ 서버 연결 완료'; })
-  .catch(err => { console.error(err); const c = $('conn'); c.textContent = '서버 연결 실패: Firebase 설정과 익명 로그인 사용 여부를 확인하세요.'; c.classList.add('err'); });
+  .catch(err => { console.error(err); const c = $('conn'); c.textContent = '서버 연결 실패 — ' + why(err); c.classList.add('err'); });
 </script>
 </body>
 </html>
