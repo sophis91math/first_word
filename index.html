@@ -211,6 +211,18 @@
   .detail .row{margin-bottom:9px}
   .detail .row b{font-family:'Jua',sans-serif; font-weight:400; font-size:19px; margin-right:8px}
   .detail .row span{color:var(--muted)}
+  .detail h3{font-family:'Jua',sans-serif; font-weight:400; font-size:22px; margin:4px 0 10px}
+  .rlist{display:flex; flex-direction:column; gap:6px}
+  .rrow{display:grid; grid-template-columns:52px minmax(120px,190px) 64px 1fr; align-items:center; gap:10px; padding:8px 12px; border-radius:14px; background:#fbf6ef}
+  .rrow .rk{font-family:'Jua',sans-serif; font-size:20px; text-align:center; color:var(--muted)}
+  .rrow .nm{font-family:'Jua',sans-serif; font-size:19px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .rrow .nm small{color:var(--muted); font-size:14px; margin-right:6px}
+  .rrow .ct{font-family:'Jua',sans-serif; font-size:20px; color:var(--accent); text-align:right}
+  .rrow .ws{color:var(--muted); font-size:14px; line-height:1.4}
+  .rrow.t1{background:#fff3c4} .rrow.t2{background:#eceff4} .rrow.t3{background:#f6e3d3}
+  .rrow.t1 .rk, .rrow.t2 .rk, .rrow.t3 .rk{color:var(--ink)}
+  .rrow.me{outline:3px solid var(--accent2)}
+  @media (max-width:640px){ .rrow{grid-template-columns:40px 1fr 52px} .rrow .ws{grid-column:2 / -1} }
   .modal .close{margin-top:14px; background:var(--accent2); color:#fff; box-shadow:0 5px 0 #2a5bc0}
   .pw-modal{max-width:380px}
   .pw-modal input{width:100%; text-align:center; font-size:34px; letter-spacing:.4em; margin:16px 0 20px}
@@ -385,7 +397,6 @@
 <script type="module">
 // ============================================================
 // ★ 1. Firebase 프로젝트 설정값 (Firebase 콘솔 > 프로젝트 설정 > 내 앱 > SDK 설정 및 구성)
-//    '평균 맞추기 게임'과 같은 프로젝트를 그대로 사용합니다.
 // ★ 2. 교사용 방 만들기 비밀번호
 // ★ 3. 이 게임이 쓰는 Firestore 위치: chosungRooms/{방번호}, chosungRooms/{방번호}/students/{학번_이름}
 // ============================================================
@@ -469,6 +480,7 @@ let store = null;
 let room = null;            // 방 상태
 let students = [];          // 학생 목록
 let pin = null, mode = 'home';
+let meKey = null;            // 학생 화면: 내 key (결과에서 내 줄 표시)
 let unsubs = [];
 
 // Firebase 오류를 선생님이 알아볼 수 있는 말로 바꾼다
@@ -600,10 +612,17 @@ function showResults(celebrate){
       <div class="n">${g.length ? g[0].n + '개' : ''}</div><div class="step">${k}</div></div>`;
   };
   $('podium').innerHTML = col(2, 'p2') + col(1, 'p1') + col(3, 'p3');
-  const top = players.filter(x => x.rank <= 3);
-  $('detail').innerHTML = top.length
-    ? top.map(x => `<div class="row"><b>${x.rank}등 ${esc(x.studentId)} ${esc(x.name)}</b><span>${(x.words || []).map(esc).join(', ')}</span></div>`).join('')
-    : '<div class="row"><span>단어를 쓴 학생이 없어요.</span></div>';
+  // 참여한 학생 전체 순위
+  $('detail').innerHTML = r.length
+    ? `<h3>📋 참여한 학생 전체 (${r.length}명)</h3><div class="rlist">` + r.map(x => {
+        const medal = x.rank === 1 ? '🥇' : x.rank === 2 ? '🥈' : x.rank === 3 ? '🥉' : '';
+        return `<div class="rrow${x.rank && x.rank <= 3 ? ' t' + x.rank : ''}${x.key === meKey ? ' me' : ''}">
+          <span class="rk">${x.rank ? (medal || x.rank + '등') : '-'}</span>
+          <span class="nm"><small>${esc(x.studentId)}</small>${esc(x.name)}${x.key === meKey ? ' (나)' : ''}</span>
+          <span class="ct">${x.n}개</span>
+          <span class="ws">${(x.words || []).map(esc).join(', ')}</span></div>`;
+      }).join('') + '</div>'
+    : '<div class="row"><span>참여한 학생이 없어요.</span></div>';
   $('resOverlay').classList.add('show');
   if (celebrate && players.length) confetti();
 }
@@ -624,7 +643,7 @@ function confetti(){
 function leave(){
   unsubs.forEach(u => { try { u(); } catch {} }); unsubs = [];
   T.stopLocal();
-  room = null; students = []; pin = null; mode = 'home'; shownResultFor = null;
+  room = null; students = []; pin = null; mode = 'home'; shownResultFor = null; meKey = null;
   hideResults(); show('sHome'); refreshReopen();
 }
 document.querySelectorAll('[data-home]').forEach(b => b.addEventListener('click', leave));
@@ -818,7 +837,7 @@ const T = (() => {
   function scheduleBoard(){ if (!boardTimer) boardTimer = setTimeout(publishBoard, 1500); }
   function publishFinal(){
     clearTimeout(boardTimer); boardTimer = null;
-    const list = ranked().filter(x => x.rank && x.rank <= 3).map(({ key, studentId, name, n, words }) => ({ key, studentId, name, n, words }));
+    const list = ranked().map(({ key, studentId, name, n, words }) => ({ key, studentId, name, n, words }));
     const b = boardNow(); lastBoard = JSON.stringify(b);
     save({ board: b, results: { round: room.round, list, players: b.length, total: b.reduce((a, x) => a + x.n, 0) } });
   }
@@ -965,7 +984,7 @@ const S = (() => {
   let save = null;
 
   function enter(p, k, s, n, j){
-    pin = p; key = k; sid = s; name = n; joinedAt = j; mode = 'student'; room = null; students = [];
+    pin = p; key = k; sid = s; name = n; joinedAt = j; mode = 'student'; meKey = k; room = null; students = [];
     myRound = null; myWords = []; shownResultFor = null;
     save = writer(d => store.setStudent(pin, key, d));
     $('sWho').innerHTML = `🐢 ${esc(sid)} ${esc(name)}<small>방 ${esc(p)}</small>`;
