@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>오늘의 초성게임 · 거북이 레이스</title>
+<title>오늘의 초성게임 · 초성 레이스</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
 <style>
@@ -37,7 +37,18 @@
 
   /* 메인 */
   .home{max-width:560px; margin:0 auto; text-align:center}
-  .home .turtle-hero{font-size:80px; display:inline-block; transform:scaleX(-1); animation:walk 2.4s ease-in-out infinite}
+  .hero{display:flex; justify-content:center; flex-wrap:wrap; gap:2px 4px; margin:4px 0 6px}
+  .hero .av{width:52px; height:52px; animation:hop 1.6s ease-in-out infinite}
+  @keyframes hop{0%,100%{transform:translateY(0)}40%{transform:translateY(-8px) rotate(-6deg)}60%{transform:translateY(0) rotate(4deg)}}
+  .avgrid{display:grid; grid-template-columns:repeat(5,1fr); gap:8px}
+  .avopt{background:#fbf6ef; border:3px solid transparent; border-radius:16px; padding:6px 2px 4px; display:flex; flex-direction:column; align-items:center; gap:2px; font-size:13px; color:var(--ink); box-shadow:none; font-family:'Noto Sans KR',sans-serif}
+  .avopt .av{width:46px; height:46px}
+  .avopt.on{border-color:var(--accent2); background:#eaf1ff}
+  .avopt.on .av{animation:hop 1s ease-in-out infinite}
+  .pcol .pav{width:58px; height:58px; margin-bottom:2px}
+  .pcol .pav .av{width:58px; height:58px; display:inline-block; margin:0 -6px}
+  .rrow .nm .av{width:28px; height:28px; display:inline-block; vertical-align:middle; margin-right:6px}
+  .who .av{width:34px; height:34px; display:inline-block; vertical-align:middle}
   @keyframes walk{0%,100%{transform:scaleX(-1) translateX(0)}50%{transform:scaleX(-1) translateX(-24px) rotate(-6deg)}}
   .home p{color:var(--muted); margin:6px 0 24px}
   .home .col{display:flex; flex-direction:column; gap:14px}
@@ -144,15 +155,16 @@
     background:repeating-conic-gradient(#2b2335 0 25%, #fff 0 50%) 0 0/16px 16px; opacity:.8}
   .turtle{position:absolute; top:50%; left:0; transform:translateY(-50%); display:flex; align-items:center; gap:4px;
     transition:left .9s cubic-bezier(.3,1.25,.5,1); white-space:nowrap}
-  .turtle .t{font-size:40px; display:inline-block; transform:scaleX(-1)}
+  .turtle .t{width:48px; height:48px; display:inline-block}
+  .turtle .t svg, .av svg{width:100%; height:100%; display:block; overflow:visible}
   .turtle.crawl .t{animation:crawl .9s ease}
-  @keyframes crawl{0%,100%{transform:scaleX(-1) rotate(0)}20%{transform:scaleX(-1) translateY(-6px) rotate(-14deg)}45%{transform:scaleX(-1) rotate(10deg)}70%{transform:scaleX(-1) translateY(-3px) rotate(-8deg)}}
+  @keyframes crawl{0%,100%{transform:none}20%{transform:translateY(-7px) rotate(-12deg)}45%{transform:rotate(9deg)}70%{transform:translateY(-3px) rotate(-6deg)}}
   .turtle .cnt{font-family:'Jua',sans-serif; font-size:18px; background:#fff; border-radius:999px; padding:1px 10px; box-shadow:0 2px 0 rgba(0,0,0,.12)}
   .turtle .crown{position:absolute; left:8px; top:-14px; font-size:20px}
   .track .empty{padding:26px; text-align:center; color:#5e7a52; font-size:16px}
   @media (max-width:640px){
     .lane .label{width:88px; font-size:16px} .lane .road{left:96px; right:40px} .lane .finish{width:40px}
-    .turtle .t{font-size:32px}
+    .turtle .t{width:38px; height:38px}
   }
 
   /* 학생 화면 */
@@ -251,8 +263,8 @@
 <!-- 메인 -->
 <section class="screen on" id="sHome">
   <div class="panel home">
-    <div class="turtle-hero">🐢</div>
-    <p>단어를 하나 쓸 때마다 내 거북이가 한 칸씩 기어가요!</p>
+    <div class="hero" id="hero"></div>
+    <p>캐릭터를 골라 입장하고, 단어를 하나 쓸 때마다 한 칸씩 달려가요!</p>
     <div class="col">
       <button class="btn-student" id="goJoin">🙋 학생: 입장하기</button>
       <button class="btn-teacher" id="goTeacher">👩‍🏫 교사용: 방 만들기</button>
@@ -269,7 +281,7 @@
 <!-- 학생 입장 -->
 <section class="screen" id="sJoin">
   <form class="panel join" id="joinForm" autocomplete="off">
-    <h2>🐢 게임 입장</h2>
+    <h2>🏁 게임 입장</h2>
     <label for="jPin">방 번호</label>
     <input id="jPin" class="pin" inputmode="numeric" maxlength="5" placeholder="00000">
     <label>학번 · 이름</label>
@@ -277,6 +289,8 @@
       <input id="jSid" inputmode="numeric" maxlength="10" placeholder="학번">
       <input id="jName" maxlength="10" placeholder="이름">
     </div>
+    <label>내 캐릭터 고르기</label>
+    <div class="avgrid" id="avGrid"></div>
     <button class="go" type="submit" id="joinBtn">입장하기</button>
     <button class="back" type="button" data-home>← 처음으로</button>
   </form>
@@ -330,7 +344,7 @@
     </section>
   </div>
   <section class="panel race">
-    <div class="race-head"><h2>🐢 거북이 레이스</h2><span id="tRaceInfo">단어 1개 = 한 걸음</span></div>
+    <div class="race-head"><h2>🏁 초성 레이스</h2><span id="tRaceInfo">단어 1개 = 한 걸음</span></div>
     <div class="track teach" id="tTrack"></div>
   </section>
   <section class="panel review">
@@ -365,7 +379,7 @@
       </div>
     </section>
     <section class="panel">
-      <div class="race-head"><h2>🐢 거북이 레이스</h2><span id="sRaceInfo"></span></div>
+      <div class="race-head"><h2>🏁 초성 레이스</h2><span id="sRaceInfo"></span></div>
       <div class="track" id="sTrack"></div>
     </section>
   </div>
@@ -417,7 +431,6 @@
 // ★ 2. 교사용 방 만들기 비밀번호
 // ★ 3. 이 게임이 쓰는 Firestore 위치: chosungRooms/{방번호}, chosungRooms/{방번호}/students/{학번_이름}
 // ============================================================
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
   apiKey: "AIzaSyCZcy-y7gFw1GREbVo-c9t4G-MySqmcFuc",
   authDomain: "firstword2-d6abd.firebaseapp.com",
@@ -494,6 +507,80 @@ const pick = a => a[Math.floor(Math.random() * a.length)];
 const fmt = s => { s = Math.max(0, Math.ceil(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
 const ls = { get(k){ try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }, set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
 
+// ---------------- 캐릭터 (오리지널 SVG 10종, 모두 오른쪽을 보고 있음) ----------------
+const S_ = 'stroke="#2b2335" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"';
+const EYE = (x, y, r = 2.4) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#2b2335"/><circle cx="${x + .8}" cy="${y - .9}" r="${r * .35}" fill="#fff"/>`;
+const CHEEK = (x, y, rx = 3.2) => `<ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${rx * .62}" fill="#ff8fa8" opacity=".75"/>`;
+const AVATARS = {
+  turtle: { name: '꼬북이', svg: `
+    <g ${S_}><ellipse cx="18" cy="50" rx="5" ry="4" fill="#9be08f"/><ellipse cx="38" cy="50" rx="5" ry="4" fill="#9be08f"/>
+    <path d="M7 46 Q6 19 29 19 Q50 19 50 46 Z" fill="#5fb35a"/></g>
+    <path d="M19 33 L29 27 L39 33 L36 42 L22 42 Z" fill="#3f8f3b"/>
+    <g ${S_}><circle cx="50" cy="37" r="9.5" fill="#9be08f"/></g>${EYE(53, 35)}${CHEEK(55, 40)}
+    <path d="M52 42 q2 1.5 4 0" fill="none" ${S_} stroke-width="2"/>` },
+  mochi: { name: '찹쌀이', svg: `
+    <g ${S_}><path d="M7 52 Q5 21 32 20 Q59 21 57 52 Z" fill="#fffaf2"/></g>
+    <circle cx="20" cy="30" r="1.2" fill="#e8dccb"/><circle cx="27" cy="25" r="1" fill="#e8dccb"/><circle cx="15" cy="40" r="1" fill="#e8dccb"/>
+    ${EYE(37, 36)}${EYE(48, 36)}${CHEEK(33, 42)}${CHEEK(52, 42)}
+    <path d="M40 41 q1.7 2 3.2 0 q1.6 2 3.2 0" fill="none" ${S_} stroke-width="2"/>` },
+  crycat: { name: '울보냥', svg: `
+    <g ${S_}><path d="M12 40 Q2 32 7 22" fill="none" stroke-width="4"/>
+    <ellipse cx="29" cy="44" rx="19" ry="12" fill="#b9c0cc"/>
+    <path d="M33 23 L34 10 L42 18 Z" fill="#c9cfd9"/><path d="M48 17 L55 9 L56 23 Z" fill="#c9cfd9"/>
+    <circle cx="45" cy="30" r="13" fill="#c9cfd9"/></g>
+    ${EYE(41, 30, 3)}${EYE(51, 30, 3)}${CHEEK(38, 36)}
+    <path d="M52 35 Q48.5 41 52 43.5 Q55.5 41 52 35Z" fill="#6fb7ff" stroke="#2b2335" stroke-width="1.5"/>
+    <path d="M44 37 q2 -2 4 0" fill="none" ${S_} stroke-width="2"/>` },
+  jellybear: { name: '말랑곰', svg: `
+    <g ${S_}><circle cx="22" cy="23" r="6.5" fill="#ffb347"/><circle cx="45" cy="23" r="6.5" fill="#ffb347"/>
+    <rect x="12" y="23" width="44" height="32" rx="16" fill="#ffb347"/></g>
+    <ellipse cx="20" cy="32" rx="3" ry="5" fill="#fff" opacity=".55"/>
+    <ellipse cx="43" cy="42" rx="8" ry="6" fill="#ffe0b0"/>
+    ${EYE(36, 35)}${EYE(50, 35)}<ellipse cx="44" cy="39.5" rx="2.6" ry="1.9" fill="#2b2335"/>
+    <path d="M42 43 q2 2 4 0" fill="none" ${S_} stroke-width="2"/>${CHEEK(31, 41)}` },
+  bunny: { name: '토실토끼', svg: `
+    <g ${S_}><ellipse cx="33" cy="15" rx="5" ry="12" fill="#fff" transform="rotate(-14 33 15)"/>
+    <ellipse cx="45" cy="14" rx="5" ry="12" fill="#fff" transform="rotate(12 45 14)"/></g>
+    <ellipse cx="33" cy="16" rx="2" ry="7.5" fill="#ffc2d1" transform="rotate(-14 33 16)"/><ellipse cx="45" cy="15" rx="2" ry="7.5" fill="#ffc2d1" transform="rotate(12 45 15)"/>
+    <g ${S_}><circle cx="18" cy="46" r="4.5" fill="#fff"/><ellipse cx="38" cy="41" rx="19" ry="15" fill="#fff"/></g>
+    ${EYE(34, 38)}${EYE(46, 38)}<path d="M38.5 42 l1.5 1.4 l1.5 -1.4 Z" fill="#ff7f9c" stroke="#ff7f9c" stroke-width="1.5" stroke-linejoin="round"/>
+    ${CHEEK(30, 44)}${CHEEK(50, 44)}` },
+  penguin: { name: '펭펭', svg: `
+    <g ${S_}><ellipse cx="28" cy="57" rx="5" ry="2.8" fill="#ffa53a"/><ellipse cx="39" cy="57" rx="5" ry="2.8" fill="#ffa53a"/>
+    <ellipse cx="32" cy="37" rx="18" ry="20" fill="#34406b"/><path d="M16 36 Q8 45 16 50" fill="#34406b"/></g>
+    <ellipse cx="37" cy="41" rx="11.5" ry="14" fill="#fff"/>
+    ${EYE(42, 29)}<g ${S_}><path d="M47 32 L57 34.5 L47 37.5 Z" fill="#ffa53a"/></g>${CHEEK(43, 36, 2.8)}` },
+  hamster: { name: '볼빵햄', svg: `
+    <g ${S_}><circle cx="24" cy="25" r="5.5" fill="#f2c27b"/><circle cx="41" cy="23" r="5.5" fill="#f2c27b"/>
+    <ellipse cx="32" cy="41" rx="23" ry="17" fill="#f2c27b"/></g>
+    <circle cx="24" cy="25" r="2.4" fill="#ffb0a0"/><circle cx="41" cy="23" r="2.4" fill="#ffb0a0"/>
+    <ellipse cx="42" cy="45" rx="13" ry="10.5" fill="#fff4e0"/>
+    <circle cx="36" cy="45" r="5.5" fill="#ffc2b4"/><circle cx="52" cy="44" r="4.5" fill="#ffc2b4"/>
+    ${EYE(40, 36)}${EYE(50, 35)}<circle cx="46" cy="40" r="1.6" fill="#2b2335"/>` },
+  potato: { name: '감자도리', svg: `
+    <g ${S_}><path d="M31 21 Q29 11 22 11 Q25 18 31 21" fill="#6cc04a"/><path d="M33 21 Q37 12 43 13 Q39 19 33 21" fill="#6cc04a"/>
+    <path d="M9 41 Q7 25 23 22 Q34 17 46 22 Q59 27 57 41 Q57 55 40 55 Q22 57 14 51 Q9 47 9 41Z" fill="#d9a865"/></g>
+    <circle cx="17" cy="36" r="1.6" fill="#b98845"/><circle cx="24" cy="47" r="1.3" fill="#b98845"/><circle cx="29" cy="29" r="1.2" fill="#b98845"/>
+    ${EYE(37, 36, 2.2)}${EYE(48, 35, 3)}${CHEEK(34, 43)}
+    <ellipse cx="44" cy="44" rx="2.6" ry="3" fill="#7a3e2b"/>` },
+  sheep: { name: '몽글양', svg: `
+    <g fill="#5b4b5e" ${S_}><rect x="18" y="49" width="5" height="9" rx="2"/><rect x="33" y="49" width="5" height="9" rx="2"/></g>
+    <g fill="#fff" ${S_}><circle cx="18" cy="38" r="10"/><circle cx="29" cy="30" r="11"/><circle cx="41" cy="33" r="10"/><circle cx="24" cy="46" r="9"/><circle cx="38" cy="46" r="9"/></g>
+    <g fill="#fff"><circle cx="18" cy="38" r="8.7"/><circle cx="29" cy="30" r="9.7"/><circle cx="41" cy="33" r="8.7"/><circle cx="24" cy="46" r="7.7"/><circle cx="38" cy="46" r="7.7"/><circle cx="29" cy="40" r="10"/></g>
+    <g ${S_}><ellipse cx="45" cy="31" rx="4" ry="2.5" fill="#5b4b5e" transform="rotate(-25 45 31)"/><ellipse cx="51" cy="40" rx="8" ry="10" fill="#5b4b5e"/></g>
+    <circle cx="49" cy="38" r="1.9" fill="#fff"/><circle cx="55" cy="38" r="1.9" fill="#fff"/>${CHEEK(52, 44, 2.4)}` },
+  frog: { name: '개굴이', svg: `
+    <g ${S_}><ellipse cx="32" cy="45" rx="23" ry="13" fill="#7bd36b"/>
+    <circle cx="28" cy="30" r="7.5" fill="#7bd36b"/><circle cx="45" cy="30" r="7.5" fill="#7bd36b"/></g>
+    <ellipse cx="33" cy="51" rx="13" ry="5" fill="#b8ec9f"/>
+    <circle cx="28" cy="30" r="4.6" fill="#fff"/><circle cx="45" cy="30" r="4.6" fill="#fff"/>
+    <circle cx="30" cy="30" r="2.3" fill="#2b2335"/><circle cx="47" cy="30" r="2.3" fill="#2b2335"/>
+    <path d="M31 43 Q41 50 51 42" fill="none" ${S_} stroke-width="2.2"/>${CHEEK(27, 44)}${CHEEK(53, 41)}` },
+};
+const AV_IDS = Object.keys(AVATARS);
+const avSvg = id => `<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${(AVATARS[id] || AVATARS.turtle).svg}</svg>`;
+const avName = id => (AVATARS[id] || AVATARS.turtle).name;
+
 let store = null;
 let room = null;            // 방 상태
 let students = [];          // 학생 목록
@@ -568,7 +655,7 @@ function fitWords(st){
 function validWords(st){ return fitWords(st).filter(w => wordStatus(w) === 'ok'); }
 // 교사: 학생 문서에서 직접 센다 / 학생: 교사가 올린 순위표(room.board)만 본다
 function standings(){
-  if (mode === 'teacher') return students.map(s => { const w = validWords(s); return { key: s.key, studentId: s.studentId, name: s.name, n: w.length, words: w }; });
+  if (mode === 'teacher') return students.map(s => { const w = validWords(s); return { key: s.key, studentId: s.studentId, name: s.name, avatar: s.avatar, n: w.length, words: w }; });
   return Array.isArray(room?.board) ? room.board : [];
 }
 function ranked(list = standings()){
@@ -593,7 +680,7 @@ function renderRace(el, myKey){
     let lane = existing.get(s.key);
     if (!lane){
       lane = document.createElement('div'); lane.className = 'lane'; lane.dataset.key = s.key;
-      lane.innerHTML = '<div class="label"></div><div class="road"><div class="turtle"><span class="crown"></span><span class="t">🐢</span><span class="cnt"></span></div></div><div class="finish"></div>';
+      lane.innerHTML = '<div class="label"></div><div class="road"><div class="turtle"><span class="crown"></span><span class="t"></span><span class="cnt"></span></div></div><div class="finish"></div>';
     }
     existing.delete(s.key);
     if (el.children[i] !== lane) el.insertBefore(lane, el.children[i] || null);
@@ -603,6 +690,8 @@ function renderRace(el, myKey){
     const tu = lane.querySelector('.turtle');
     tu.style.left = `calc(${(p * 100).toFixed(2)}% - ${(p * 64).toFixed(1)}px)`;
     tu.querySelector('.cnt').textContent = s.n >= goal ? `${s.n} 🏁` : s.n;
+    const av = AVATARS[s.avatar] ? s.avatar : 'turtle', tEl = tu.querySelector('.t');
+    if (tEl.dataset.av !== av){ tEl.dataset.av = av; tEl.innerHTML = avSvg(av); tEl.title = avName(av); }
     tu.querySelector('.crown').textContent = (top > 0 && s.n === top) ? '👑' : '';
     const k = (room?.round || '') + '|' + s.key;
     const before = lastCount.get(k);
@@ -626,6 +715,7 @@ function showResults(celebrate){
     const g = groups[k - 1];
     const skipped = !g.length && players.filter(x => x.rank < k).length >= k;
     return `<div class="pcol ${cls}${g.length ? '' : ' none'}">
+      ${g.length ? `<div class="pav">${g.slice(0, 3).map(x => `<span class="av">${avSvg(x.avatar)}</span>`).join('')}</div>` : ''}
       <div class="names">${g.length ? g.map(x => esc(x.name)).join('<br>') : (skipped ? '<span style="font-size:16px">공동 순위로<br>건너뜀</span>' : '—')}</div>
       <div class="n">${g.length ? g[0].n + '개' : ''}</div><div class="step">${k}</div></div>`;
   };
@@ -636,7 +726,7 @@ function showResults(celebrate){
         const medal = x.rank === 1 ? '🥇' : x.rank === 2 ? '🥈' : x.rank === 3 ? '🥉' : '';
         return `<div class="rrow${x.rank && x.rank <= 3 ? ' t' + x.rank : ''}${x.key === meKey ? ' me' : ''}">
           <span class="rk">${x.rank ? (medal || x.rank + '등') : '-'}</span>
-          <span class="nm"><small>${esc(x.studentId)}</small>${esc(x.name)}${x.key === meKey ? ' (나)' : ''}</span>
+          <span class="nm"><span class="av">${avSvg(x.avatar)}</span><small>${esc(x.studentId)}</small>${esc(x.name)}${x.key === meKey ? ' (나)' : ''}</span>
           <span class="ct">${x.n}개</span>
           <span class="ws">${(x.words || []).map(esc).join(', ')}</span></div>`;
       }).join('') + '</div>'
@@ -679,11 +769,19 @@ function listen(p){
 }
 
 // ---------------- 메인 ----------------
+ // 첫 화면 캐릭터 행진 + 입장 화면 캐릭터 고르기
+$('hero').innerHTML = AV_IDS.map((id, i) => `<span class="av" style="animation-delay:${(i * .12).toFixed(2)}s" title="${avName(id)}">${avSvg(id)}</span>`).join('');
+let pickedAv = null;
+function renderAvGrid(){
+  $('avGrid').innerHTML = AV_IDS.map(id => `<button type="button" class="avopt${id === pickedAv ? ' on' : ''}" data-av="${id}"><span class="av">${avSvg(id)}</span>${avName(id)}</button>`).join('');
+}
+$('avGrid').addEventListener('click', e => { const b = e.target.closest('[data-av]'); if (!b) return; pickedAv = b.dataset.av; renderAvGrid(); });
 $('qrBox').onclick = () => $('qrOverlay').classList.add('show');
 $('qrOverlay').onclick = () => $('qrOverlay').classList.remove('show');
 $('goJoin').onclick = () => {
   const saved = ls.get('chosungStudent') || {};
   $('jPin').value = saved.pin || ''; $('jSid').value = saved.sid || ''; $('jName').value = saved.name || '';
+  pickedAv = AVATARS[saved.av] ? saved.av : null; renderAvGrid();
   show('sJoin'); ($('jPin').value ? $('jSid') : $('jPin')).focus();
 };
 let reopenPin = null;
@@ -736,6 +834,7 @@ $('joinForm').addEventListener('submit', async e => {
   e.preventDefault();
   const p = $('jPin').value.trim(), sid = $('jSid').value.trim().replace(/\s+/g, ''), name = $('jName').value.trim().replace(/\s+/g, '');
   if (!p || !sid || !name) return toast('방 번호, 학번, 이름을 모두 입력하세요.', true);
+  if (!pickedAv) return toast('내 캐릭터를 골라 주세요!', true);
   if (!store) return toast('서버에 아직 연결되지 않았어요.', true);
   $('joinBtn').disabled = true;
   try {
@@ -744,10 +843,10 @@ $('joinForm').addEventListener('submit', async e => {
     if (r.createdAt && Date.now() - r.createdAt > ROOM_TTL) return toast('만료된 방이에요.', true);
     const key = `${sid}_${name}`.replace(/[\/.#$\[\]]/g, '');
     const joinedAt = Date.now();
-    await store.setStudent(p, key, { studentId: sid, name, joinedAt });
-    ls.set('chosungStudent', { pin: p, sid, name });
-    S.enter(p, key, sid, name, joinedAt);
-    toast(`${name} 학생, 환영해요! 🐢`);
+    await store.setStudent(p, key, { studentId: sid, name, joinedAt, avatar: pickedAv });
+    ls.set('chosungStudent', { pin: p, sid, name, av: pickedAv });
+    S.enter(p, key, sid, name, joinedAt, pickedAv);
+    toast(`${name} 학생, 환영해요! ${avName(pickedAv)}와(과) 함께 달려요!`);
   } catch (err){ console.error(err); toast('입장 실패 — ' + why(err), true); }
   finally { $('joinBtn').disabled = false; }
 });
@@ -846,7 +945,7 @@ const T = (() => {
 
   // 학생 화면용 순위표: 1.5초에 한 번, 바뀌었을 때만 방 정보에 올린다
   let boardTimer = null, lastBoard = null;
-  function boardNow(){ return standings().map(({ key, studentId, name, n }) => ({ key, studentId, name, n })); }
+  function boardNow(){ return standings().map(({ key, studentId, name, avatar, n }) => ({ key, studentId, name, avatar: AVATARS[avatar] ? avatar : 'turtle', n })); }
   function publishBoard(){
     boardTimer = null;
     if (!pin || !room) return;
@@ -857,7 +956,7 @@ const T = (() => {
   function scheduleBoard(){ if (!boardTimer) boardTimer = setTimeout(publishBoard, 1500); }
   function publishFinal(){
     clearTimeout(boardTimer); boardTimer = null;
-    const list = ranked().map(({ key, studentId, name, n, words }) => ({ key, studentId, name, n, words }));
+    const list = ranked().map(({ key, studentId, name, avatar, n, words }) => ({ key, studentId, name, avatar: AVATARS[avatar] ? avatar : 'turtle', n, words }));
     const b = boardNow(); lastBoard = JSON.stringify(b);
     save({ board: b, results: { round: room.round, list, players: b.length, total: b.reduce((a, x) => a + x.n, 0) } });
   }
@@ -1003,11 +1102,11 @@ const S = (() => {
   let key = null, sid = null, name = null, myRound = null, myWords = [], loop = null, joinedAt = 0;
   let save = null;
 
-  function enter(p, k, s, n, j){
+  function enter(p, k, s, n, j, av){
     pin = p; key = k; sid = s; name = n; joinedAt = j; mode = 'student'; meKey = k; room = null; students = [];
     myRound = null; myWords = []; shownResultFor = null;
     save = writer(d => store.setStudent(pin, key, d));
-    $('sWho').innerHTML = `🐢 ${esc(sid)} ${esc(name)}<small>방 ${esc(p)}</small>`;
+    $('sWho').innerHTML = `<span class="av">${avSvg(av)}</span> ${esc(sid)} ${esc(name)}<small>방 ${esc(p)}</small>`;
     $('msg').textContent = ''; renderMine();
     show('sStudent'); listen(p);
     cancelAnimationFrame(loop); loop = requestAnimationFrame(clock);
@@ -1088,7 +1187,7 @@ const S = (() => {
     const stt = wordStatus(w);
     if (stt === 'no'){ say(`‘${w}’은(는) 선생님이 인정하지 않은 단어예요.`, 'err'); flash('bad'); beep(200, .15, .12); wordIn.select(); return; }
     myWords.push(w); push();
-    if (stt === 'ok'){ say(`‘${w}’ 통과! 거북이가 한 걸음 🐢`, 'ok'); flash('good'); beep(988, .08, .1, 'triangle'); }
+    if (stt === 'ok'){ say(`‘${w}’ 통과! 내 캐릭터가 한 걸음 전진 🏃`, 'ok'); flash('good'); beep(988, .08, .1, 'triangle'); }
     else { say(`‘${w}’은(는) 사전에 없어요. 선생님이 인정하면 점수가 올라가요 ❓`, 'err'); flash('bad'); beep(330, .12, .1); }
     wordIn.value = ''; wordIn.focus(); renderMine();
   });
